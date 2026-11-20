@@ -1,12 +1,12 @@
-name: Build MongoDB without AVX
+name: Build Percona Server for MongoDB without AVX
 
 on:
   push:
-    tags: ['v*']
+    tags: ['psmdb-*']
   workflow_dispatch:
     inputs:
-      mongo_version:
-        description: 'MongoDB version to build (e.g. 7.0.28)'
+      psmdb_version:
+        description: 'Percona Server for MongoDB version to build (e.g. 8.0.38-16)'
         required: true
         type: string
 
@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-${{ github.event_name == 'workflow_dispatch' && inputs.mongo_version || github.ref_name }}
+  group: build-${{ github.event_name == 'workflow_dispatch' && inputs.psmdb_version || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -30,18 +30,19 @@ jobs:
       packages: write
 
     steps:
-      - name: Determine MongoDB version
+      - name: Determine Percona Server for MongoDB version
         id: version
         env:
-          RAW: ${{ github.event_name == 'workflow_dispatch' && inputs.mongo_version || github.ref_name }}
+          RAW: ${{ github.event_name == 'workflow_dispatch' && inputs.psmdb_version || github.ref_name }}
         run: |
-          VERSION="${RAW#v}"
-          if ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
-            echo "::error::'$RAW' is not a MongoDB version like 7.0.28 or v7.0.28"
+          VERSION="${RAW#psmdb-}"
+          if ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)-[0-9]+$ ]]; then
+            echo "::error::'$RAW' is not a Percona version like 8.0.38-16 or psmdb-8.0.38-16"
             exit 1
           fi
           {
             echo "full=$VERSION"
+            echo "mongo=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
             echo "minor=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
             echo "major=${BASH_REMATCH[1]}"
           } >> "$GITHUB_OUTPUT"
@@ -69,6 +70,7 @@ jobs:
           flavor: latest=false
           tags: |
             type=raw,value=${{ steps.version.outputs.full }}
+            type=raw,value=${{ steps.version.outputs.mongo }}
             type=raw,value=${{ steps.version.outputs.minor }}
             type=raw,value=${{ steps.version.outputs.major }}
             type=raw,value=latest
@@ -82,7 +84,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            MONGO_VERSION=${{ steps.version.outputs.full }}
+            PSMDB_VERSION=${{ steps.version.outputs.full }}
             NUM_JOBS=4
           cache-from: type=gha
           cache-to: type=gha,mode=max

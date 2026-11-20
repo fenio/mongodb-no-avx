@@ -1,0 +1,127 @@
+diff --git a/bazel/toolchains/cc/mongo_linux/mongo_compiler_flags.bzl b/bazel/toolchains/cc/mongo_linux/mongo_compiler_flags.bzl
+index 5c501145..87d7b04b 100644
+--- a/bazel/toolchains/cc/mongo_linux/mongo_compiler_flags.bzl
++++ b/bazel/toolchains/cc/mongo_linux/mongo_compiler_flags.bzl
+@@ -281,7 +281,7 @@ MTUNE_MARCH_COPTS = select({
+     # the 256 wide vector instructions because the heavy versions can cause
+     # clock speed reductions.
+     "//bazel/config:linux_x86_64": [
+-        "-march=sandybridge",
++        "-march=nehalem",
+         "-mtune=generic",
+         "-mprefer-vector-width=128",
+     ],
+diff --git a/src/third_party/aws-sdk-cpp/BUILD.bazel b/src/third_party/aws-sdk-cpp/BUILD.bazel
+index ee1961a6..4dbfd59e 100644
+--- a/src/third_party/aws-sdk-cpp/BUILD.bazel
++++ b/src/third_party/aws-sdk-cpp/BUILD.bazel
+@@ -64,7 +64,6 @@ mongo_cc_library(
+         "@platforms//cpu:x86_64": [
+             "dist/crt/aws-crt-cpp/crt/aws-c-common/source/arch/intel/asm/cpuid.c",
+             "dist/crt/aws-crt-cpp/crt/aws-c-common/source/arch/intel/cpuid.c",
+-            "dist/crt/aws-crt-cpp/crt/aws-c-common/source/arch/intel/encoding_avx2.c",
+         ],
+         "@platforms//cpu:aarch64": [
+             "dist/crt/aws-crt-cpp/crt/aws-c-common/source/arch/arm/auxv/cpuid.c",
+@@ -107,8 +106,6 @@ mongo_cc_library(
+         # Platform specific source file include path
+         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+         "@platforms//cpu:x86_64": [
+-            "-mavx",
+-            "-mavx2",
+         ],
+         "@platforms//cpu:aarch64": [
+             "-moutline-atomics",
+@@ -142,14 +139,7 @@ mongo_cc_library(
+         "_POSIX_C_SOURCE=200809L",
+         "_XOPEN_SOURCE=500",
+         "aws_c_common_EXPORTS",
+-    ] + select({
+-        # Platform specific source file include path
+-        # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+-        "@platforms//cpu:x86_64": [
+-            "USE_SIMD_ENCODING",
+-        ],
+-        "//conditions:default": [],
+-    }),
++    ],
+     target_compatible_with = TARGET_COMPATIBILITY,
+     deps = [
+         "aws-cjson",
+@@ -194,12 +184,6 @@ mongo_cc_library(
+         # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+         "@platforms//cpu:x86_64": [
+             "-msse4.2",
+-            "-mavx512f",
+-            "-mvpclmulqdq",
+-            "-mavx512vl",
+-            "-mavx",
+-            "-mavx2",
+-            "-mpclmul",
+         ],
+         "@platforms//cpu:aarch64": [
+             "-moutline-atomics",
+diff --git a/src/third_party/aws-sdk-cpp/platform/linux_x86_64/crt/aws-crt-cpp/crt/aws-c-common/generated/include/aws/common/config.h b/src/third_party/aws-sdk-cpp/platform/linux_x86_64/crt/aws-crt-cpp/crt/aws-c-common/generated/include/aws/common/config.h
+index 45c522bb..685d817e 100644
+--- a/src/third_party/aws-sdk-cpp/platform/linux_x86_64/crt/aws-crt-cpp/crt/aws-c-common/generated/include/aws/common/config.h
++++ b/src/third_party/aws-sdk-cpp/platform/linux_x86_64/crt/aws-crt-cpp/crt/aws-c-common/generated/include/aws/common/config.h
+@@ -19,10 +19,10 @@
+ #define AWS_HAVE_EXECINFO
+ /* #undef AWS_HAVE_WINAPI_DESKTOP */
+ #define AWS_HAVE_LINUX_IF_LINK_H
+-#define AWS_HAVE_AVX2_INTRINSICS
+-#define AWS_HAVE_AVX512_INTRINSICS
+-#define AWS_HAVE_MM256_EXTRACT_EPI64
+-#define AWS_HAVE_CLMUL
++/* #undef AWS_HAVE_AVX2_INTRINSICS */
++/* #undef AWS_HAVE_AVX512_INTRINSICS */
++/* #undef AWS_HAVE_MM256_EXTRACT_EPI64 */
++/* #undef AWS_HAVE_CLMUL */
+ /* #undef AWS_HAVE_ARM32_CRC */
+ /* #undef AWS_HAVE_ARMv8_1 */
+ /* #undef AWS_ARCH_ARM64 */
+diff --git a/src/third_party/mozjs/BUILD.bazel b/src/third_party/mozjs/BUILD.bazel
+index 046b7e20..d01b6fc2 100644
+--- a/src/third_party/mozjs/BUILD.bazel
++++ b/src/third_party/mozjs/BUILD.bazel
+@@ -26,7 +26,6 @@ PLATFORM_SRCS = select({
+         "platform/{}/{}/build/frontend/*.cpp".format(arch, os),
+     ]) + (
+         [
+-            "extract/mozglue/misc/SIMD_avx2.cpp",
+             "extract/mozglue/misc/SSE.cpp",
+         ] if arch == "x86_64" and os != "windows" else []
+     )
+@@ -48,7 +47,7 @@ PLATFORM_INCLUDES = select({
+ PLATFORM_COPTS = select({
+     config: [
+         ("/FI" if os == "windows" else "-include") + "$(location platform/{}/{}/build/js-confdefs.h)".format(arch, os),
+-    ] + (["-mavx2"] if arch == "x86_64" and os != "windows" else [])
++    ]
+     for config, (arch, os) in PLATFORMS.items()
+ } | {
+     "//conditions:default": ["//conditions:incompatible"],
+@@ -262,10 +261,6 @@ mongo_cc_library(
+             "-Wno-error",
+             "-Wno-return-type",
+         ],
+-    }) + select({
+-        "//bazel/config:linux_x86_64": ["-mavx2"],
+-        "//bazel/config:macos_x86_64": ["-mavx2"],
+-        "//conditions:default": [],
+     }) + select({
+         # Suppress `register` keyword warnings in FreeBSD builds
+         "@platforms//os:freebsd": [
+diff --git a/src/third_party/mozjs/extract/mozglue/misc/SIMD.cpp b/src/third_party/mozjs/extract/mozglue/misc/SIMD.cpp
+index 61ac994c..4f13407c 100644
+--- a/src/third_party/mozjs/extract/mozglue/misc/SIMD.cpp
++++ b/src/third_party/mozjs/extract/mozglue/misc/SIMD.cpp
+@@ -448,7 +448,7 @@ const char* SIMD::memchr8SSE2(const char* ptr, char value, size_t length) {
+ // assertion failure. Accordingly, we just don't allow that to happen. We
+ // are not particularly concerned about ensuring that newer 32 bit processors
+ // get access to the AVX2 functions exposed here.
+-#  if defined(MOZILLA_MAY_SUPPORT_AVX2) && defined(__x86_64__)
++#  if 0
+ 
+ bool SupportsAVX2() { return supports_avx2(); }
+ 
